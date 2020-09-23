@@ -1,9 +1,9 @@
 import {Puzzle, PuzzleSymbol, PuzzleNumber} from './PuzzleItem'
-import {puzzle} from 'cspuz'
+import {puzzle, stopRunningSolver} from 'cspuz'
 
 type AnswerType = { answer?: Puzzle, error?: string };
 
-export function solveUrl(url: string): AnswerType {
+export async function solveUrl(url: string): Promise<AnswerType> {
     const splitUrl = url.split("?");
     if (splitUrl.length !== 2) {
         return { error: "invalid url" };
@@ -16,7 +16,11 @@ export function solveUrl(url: string): AnswerType {
     return { error: "unsupported puzzle type: " + puzzleType };
 }
 
-function solveNurikabe(tokens: string[]): AnswerType {
+export function stopSolver() {
+    stopRunningSolver();
+}
+
+async function solveNurikabe(tokens: string[]): Promise<AnswerType> {
     if (tokens.length !== 4) return { error: "invalid url" };
     const width = parseInt(tokens[1]);
     const height = parseInt(tokens[2]);
@@ -51,7 +55,12 @@ function solveNurikabe(tokens: string[]): AnswerType {
         }
     }
     console.time('solve');
-    const answer = puzzle.solveNurikabe(height, width, problem);
+    let answer;
+    try {
+        answer = await puzzle.solveNurikabeAsync(height, width, problem);
+    } catch (err) {
+        return { error: err.message };
+    }
     console.timeEnd('solve');
     if (answer === null) return { error: "no answer" };
 
@@ -59,7 +68,7 @@ function solveNurikabe(tokens: string[]): AnswerType {
     for (let y = 0; y < height; ++y) {
         let row = [];
         for (let x = 0; x < width; ++x) {
-            if (problem[y][x] != -1) row.push(new PuzzleNumber(problem[y][x]));
+            if (problem[y][x] !== -1) row.push(new PuzzleNumber(problem[y][x]));
             else if (answer[y][x] === puzzle.WhiteCell) row.push(PuzzleSymbol.Dot);
             else if (answer[y][x] === puzzle.BlackCell) row.push(PuzzleSymbol.BlackCell);
             else row.push(PuzzleSymbol.Undecided);
