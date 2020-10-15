@@ -1,5 +1,5 @@
 import React from 'react';
-import {Puzzle, PuzzleItem, PuzzleSymbol, PuzzleNumber} from './PuzzleItem';
+import {Puzzle, PuzzleItem, PuzzleSymbol, PuzzleString} from './PuzzleItem';
 
 type Props = {
     margin: number;
@@ -9,8 +9,8 @@ type Props = {
 
 function getGrid(margin: number, cellSize: number, height: number, width: number) {
     if (height === 0 || width === 0) return null;
-    return <g fill="none" stroke="black" strokeWidth={2}>
-        <rect y={margin} x={margin} height={cellSize * height} width={cellSize * width} />
+    return <g fill="none" stroke="black" strokeWidth={1}>
+        <rect y={margin} x={margin} height={cellSize * height} width={cellSize * width} strokeWidth={3} />
         {
             Array(height - 1).fill(0).map((_, i) =>
                 <line y1={margin + cellSize * (i + 1)} x1={margin}
@@ -26,8 +26,42 @@ function getGrid(margin: number, cellSize: number, height: number, width: number
     </g>;
 }
 
+function getCustomGrid(margin: number, cellSize: number, height: number, width: number, wall: {horizontal: PuzzleItem[][], vertical: PuzzleItem[][]}) {
+    if (height === 0 || width === 0) return null;
+    let {horizontal, vertical} = wall;
+    let wallElems = [];
+    for (let y = 0; y < height; ++y) {
+        for (let x = 0; x < width; ++x) {
+            if (y < height - 1) {
+                if (horizontal[y][x] === PuzzleSymbol.BoldEdge || horizontal[y][x] === PuzzleSymbol.LineEdge) {
+                    let lineWidth = 1;
+                    if (horizontal[y][x] === PuzzleSymbol.BoldEdge) lineWidth = 3;
+                    wallElems.push(
+                        <line y1={margin + cellSize * (y + 1)} x1={margin + cellSize * x}
+                              y2={margin + cellSize * (y + 1)} x2={margin + cellSize * (x + 1)} strokeWidth={lineWidth} />
+                    );
+                }
+            }
+            if (x < width - 1) {
+                if (vertical[y][x] === PuzzleSymbol.BoldEdge || vertical[y][x] === PuzzleSymbol.LineEdge) {
+                    let lineWidth = 1;
+                    if (vertical[y][x] === PuzzleSymbol.BoldEdge) lineWidth = 3;
+                    wallElems.push(
+                        <line y1={margin + cellSize * y} x1={margin + cellSize * (x + 1)}
+                              y2={margin + cellSize * (y + 1)} x2={margin + cellSize * (x + 1)} strokeWidth={lineWidth} />
+                    );
+                }
+            }
+        }
+    }
+    return <g fill="none" stroke="black">
+        <rect y={margin} x={margin} height={cellSize * height} width={cellSize * width} strokeWidth={3} />
+        {wallElems}
+    </g>;
+}
+
 function getCellElement(margin: number, cellSize: number, y: number, x: number, item: PuzzleItem) {
-    if (item instanceof PuzzleNumber) {
+    if (item instanceof PuzzleString) {
         return <text y={margin + cellSize * (y + 0.5)} x={margin + cellSize * (x + 0.5)}
                      dominantBaseline='central' textAnchor='middle' style={{ fontSize: cellSize * 0.8 }}>
                     {item.value}
@@ -38,10 +72,41 @@ function getCellElement(margin: number, cellSize: number, y: number, x: number, 
         } else if (item === PuzzleSymbol.BlackCell) {
             return <rect y={margin + cellSize * y + 4} x={margin + cellSize * x + 4}
                          height={cellSize - 8} width={cellSize - 8}
-                         fill="black" stroke="none" />;
+                         fill="green" stroke="none" />;
         } else if (item === PuzzleSymbol.Dot) {
             return <rect y={margin + cellSize * (y + 0.5) - 3} x={margin + cellSize * (x + 0.5) - 3} height={6} width={6}
-                         fill="black" stroke="none" />;
+                         fill="green" stroke="none" />;
+        } else if (item === PuzzleSymbol.SideArrowUp || item === PuzzleSymbol.SideArrowDown || item === PuzzleSymbol.SideArrowLeft || item === PuzzleSymbol.SideArrowRight) {
+            let shape = [
+                [0.1, 0.1],
+                [0.5, 0.1],
+                [0.5, 0.05],
+                [0.9, 0.125],
+                [0.5, 0.2],
+                [0.5, 0.15],
+                [0.1, 0.15]
+            ];
+            let points = [];
+            for (let i = 0; i < shape.length; ++i) {
+                let dx = shape[i][0];
+                let dy = shape[i][1];
+
+                // affine transform
+                if (item === PuzzleSymbol.SideArrowLeft || item === PuzzleSymbol.SideArrowUp) {
+                    dx = 1 - dx;
+                }
+                if (item === PuzzleSymbol.SideArrowUp || item === PuzzleSymbol.SideArrowDown) {
+                    let tmp = dx;
+                    dx = dy;
+                    dy = tmp;
+                }
+
+                // adjust to the cell
+                dx = margin + cellSize * (x + dx);
+                dy = margin + cellSize * (y + dy);
+                points.push(String(dx) + "," + String(dy));
+            }
+            return <polygon points={points.join(" ")} stroke="none" fill="black" />
         } else {
             throw new Error("unsupported cell element");
         }
@@ -139,15 +204,27 @@ export class PuzzleBoard extends React.Component<Props, {}> {
             }
         }
         if (useGrid) {
-            elements.push(getGrid(margin, cellSize, height, width));
+            if (puzzle.wall) {
+                elements.push(getCustomGrid(margin, cellSize, height, width, puzzle.wall));
+            } else {
+                elements.push(getGrid(margin, cellSize, height, width));
+            }
         }
 
         for (let y = 0; y < height; ++y) {
             for (let x = 0; x < width; ++x) {
-                elements.push(getCellElement(margin, cellSize, y, x, puzzle.cell[y][x]));
+                const cellValue = puzzle.cell[y][x];
+
+                if (cellValue instanceof Array) {
+                    for (const value of cellValue) {
+                        elements.push(getCellElement(margin, cellSize, y, x, value));
+                    }
+                } else {
+                    elements.push(getCellElement(margin, cellSize, y, x, cellValue));
+                }
             }
         }
-        return <svg height={2 * margin + cellSize * height} width={2 * margin + cellSize * width}>
+        return <svg height={2 * margin + cellSize * height} width={2 * margin + cellSize * width} style={{backgroundColor: 'white'}}>
             {elements}
         </svg>;
     }

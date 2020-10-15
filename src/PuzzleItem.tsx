@@ -1,10 +1,11 @@
-export type PuzzleItem = PuzzleSymbol | PuzzleNumber;
+export type PuzzleItem = PuzzleSymbol | PuzzleString;
 
 export type Puzzle = {
     height: number;
     width: number;
-    cell: PuzzleItem[][];
+    cell: (PuzzleItem | PuzzleItem[])[][];
     loop?: {horizontal: PuzzleItem[][], vertical: PuzzleItem[][]};
+    wall?: {horizontal: PuzzleItem[][], vertical: PuzzleItem[][]};
 };
 
 export enum PuzzleSymbol {
@@ -13,12 +14,17 @@ export enum PuzzleSymbol {
     Dot,
     LineEdge,
     BlankEdge,
+    BoldEdge,
+    SideArrowUp,
+    SideArrowDown,
+    SideArrowLeft,
+    SideArrowRight,
 }
 
-export class PuzzleNumber {
-    value: number;
+export class PuzzleString {
+    value: string;
 
-    constructor(value: number) {
+    constructor(value: string) {
         this.value = value;
     }
 }
